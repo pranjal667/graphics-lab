@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>CohenSutherland Line clipping algorithm</title>
+		<script src="sketch.js"></script>
+		<style>
+			body {
+				margin: 0;
+				padding: 0;
+			}
+			canvas {
+				margin: auto;
+			}
+		</style>
+	</head>
+	<body>
+        <h1><b><u>Output</u></b></h1>
+        <canvas width="800" height="800" id= "canvas"></canvas>
+		<script type="text/javascript">
+			var start=[];
+            var end=[];
+
+            //Stack that keep tracks of the end points.
+            var stack=[];
+
+            //viewport is a square of vertices a, b, c and d
+            var ax = 200;
+            var ay = 200;
+            var bx = 500;
+            var by = 200;
+            var cx = 500;
+            var cy = 500;
+            var dx = 200;
+            var dy = 500;
+
+            //min max values required to create the outcodes
+            var xmin = ax
+            var xmax = cx
+            var ymin = ay;
+            var ymax = cy;
+
+            //Boilerplate code. Required to access the html5 canvas
+            var canvas = document.getElementById("canvas");
+            var context = canvas.getContext("2d");
+
+            //Google "html5 compositing"
+            context.globalCompositeOperation = 'source-over';
+
+            //The next 4 blocks draw our viewport
+            //drawing line x=200, of length 300 units (pixels)
+            context.beginPath();
+            context.moveTo(ax, ay);
+            context.lineTo(bx, by);
+            context.stroke();   
+
+            //drawing line y=200, length 300 pixels
+            context.beginPath();
+            context.moveTo(bx, by);
+            context.lineTo(cx,cy);
+            context.stroke();
+
+            //drawing line x=500
+            context.beginPath();
+            context.moveTo(cx, cy);
+            context.lineTo(dx, dy);
+            context.stroke();
+
+            //drawing line y=500
+            context.beginPath();
+            context.moveTo(dx, dy);
+            context.lineTo(ax, ay);
+            context.stroke();
+
+            draw_line1();
+            draw_line2();
+            draw_line3();
+            draw_line4();
+
+            //This is an event listener
+            //The function inside fires only when the mouse is clicked
+            canvas.addEventListener('mousedown', function(evt){
+            
+                if(stack.length > 0)
+                    end_points = stack.pop();
+                console.log('end points of line : ' + end_points[0] + " to " + end_points[1]);
+                clip(end_points);
+
+            });
+
+
+            function clip(end_points)
+            {
+                //New variables to hold end points. No relation 
+                //to global 'start' and 'end'
+
+                start_ = end_points[0];
+                end_ = end_points[1];
+
+                o1 = set_outcode(start_);
+                o2 = set_outcode(end_);
+
+                console.log('outcodes are : ' + o1 + ' and ' + o2);
+
+                //Botht the outcodes are 0. This means both end points are inside the viewport
+                if(o1 == '0000' && o2 == '0000')
+                    console.log('accept');
+
+                //both the outcodes have the same bit set when both end points are outside viewport
+                else if( (o1 & o2) != 0)
+                {   
+                    console.log('reject');
+                    delete_line(start_, end_);
+                }
+
+                //One end point inside viewport and one outside viewport
+                else if( (o1 & o2) == 0 && o1 == '0000' || o2 == '0000')
+                {
+                    intersections = find_intersection(o1, end_points);
+
+                    //Assuming there is only one intersection. TO DO : HANDLE MULTIPLE INTERSECTIONS
+                    console.log("Intersections are : " + intersections[0]);
+
+                    if(o1 != '0000')
+                    {
+                    delete_line(start_, intersections[0]);
+                    }
+                    else if(o2 != '0000')
+                    {
+                    delete_line(end_, intersect[0]);
+                    }
+                }
+
+                //When both end points are outside viewport but portion of line is inside
+                else if( (o1 & o2) == 0)
+                {
+                    intersections = find_intersection(o1, end_points);
+                    console.log("Intersections of start point : " + intersections[0]);
+                    delete_line(start_, intersections[0]);
+
+                    intersections = find_intersection(o2, end_points);
+                    console.log("Intersections of end point : " + intersections[0]);
+                    delete_line(end_, intersections[0]);
+                }
+            }
+
+            function set_outcode(point)
+            {
+                outcode = '';
+
+                x = point[0];
+                y = point[1];
+
+                if(y > ymax)
+                    outcode = outcode + '1';
+                else
+                    outcode = outcode + '0';
+
+                if(y < ymin)
+                    outcode = outcode + '1';
+                else
+                    outcode = outcode + '0';
+
+                if(x > xmax)
+                    outcode = outcode + '1';
+                else
+                    outcode = outcode + '0';
+
+                if(x < xmin)
+                    outcode = outcode + '1';
+                else
+                    outcode = outcode + '0';
+
+                return outcode;
+            }
+
+            function delete_line(start_, end_)
+            {
+            //To delete a line, we draw a white line 
+            //over the original line.
+
+            context.beginPath();
+            context.moveTo(start_[0], start_[1]);
+            context.lineTo(end_[0], end_[1]);
+            
+            context.strokeStyle = '#ffffff';
+
+            //We need a larger linewidth due to some issues in html5 canvas.
+            //white line of same width will only dim the original line. 
+            //No issues with same width when drawing over another color than white
+            context.lineWidth = 2;
+            context.stroke();
+            }
+
+            function find_intersection(outcode, end_points)
+            {
+
+            start_ = end_points[0];
+            end_ = end_points[1];
+
+            //All lines are of the form y = mx + c
+            //m = (y2-y1)/(x2-x1)
+            x1 = start_[0];
+            x2 = end_[0];
+            y1 = start_[1];
+            y2 = end_[1];
+
+            //Keeps track of all intersections
+            //We use a list because if the outcode contains 2 '1's, we need to calculate 2 intersections
+            intersections_list = []
+            //To temporarily store an intersection point
+            intersect=[0, 0];
+
+
+            
+
+            //find slope
+            m = (y2-y1)/(x2-x1);
+
+            //find constant 'c' by substituting one of the end points for x and y
+            c = y1 - m*x1;
+
+            if(outcode.charAt(0) == '1')
+            {
+                //intersection is on the line x=ymax
+                //The abscissa of intersect is to be calculated as (x, ymax)
+                //Ordinate of intersect is same as ymax
+                intersect[0] = (ymax - c)/m;
+                intersect[1] = ymax;
+
+                intersections_list.push(intersect);
+            }
+
+            if(outcode.charAt(1) == '1')
+            {
+                //Intersection is on the line x=ymin
+
+                intersect[0] = (ymin - c)/m;
+                intersect[1] = ymin;
+
+                intersections_list.push(intersect)
+            }
+
+            if(outcode.charAt(2) == '1')
+            {
+                //Intersection on line y=xmax
+                //The abscissa of intersect is same as xmax
+                //The ordinate of intersect is to be calculated
+                intersect[0] = xmax;
+                intersect[1] = (m * xmax + c);
+
+                intersections_list.push(intersect);
+            }
+
+            if(outcode.charAt(3) == '1')
+            {
+                //Intersection is on the line y=xmin
+                intersect[0] = xmin;
+                intersect[1] = (m * xmin + c);
+
+                intersections_list.push(intersect);
+            }
+
+            return intersections_list;
+            }
+
+            //Draw a line that is completely inside the viewport
+            function draw_line1()
+            {
+                start = [300, 300];
+                end = [400, 400];
+
+                stack.push([start, end]);
+
+                //drawing the line
+                context.beginPath();
+                context.moveTo(start[0], start[1]);
+                context.lineTo(end[0], end[1]);
+                
+                //setting stroke color in RGB. Here R=ff, G=0, B=0 to get full red
+                context.strokeStyle = "#ff0000";
+                context.lineWdith = 1;
+                context.stroke();
+            }
+
+            //Draw a line completely outside the viewport
+            function draw_line2()
+            {
+                start = [220, 100];
+                end = [300, 150];
+
+                stack.push([start, end]);
+
+                context.beginPath();
+                context.moveTo(start[0], start[1]);
+                context.lineTo(end[0], end[1]);
+
+                context.strokeStyle = "#00ff00";
+                context.lineWidth = 1;
+                context.stroke();
+            }
+
+            //Draw a line with one end point outside and one endpoint inside the viewport
+            function draw_line3()
+            {
+                start = [150, 300];
+                end = [300, 280];
+
+                stack.push([start, end]);
+
+                context.beginPath();
+                context.moveTo(start[0], start[1]);
+                context.lineTo(end[0], end[1]);
+
+                context.strokeStyle = "#0000ff";
+                context.lineWidth = 1;
+                context.stroke();
+            }
+
+            //Draw a line that cuts the viewport at 2 locations, with both endpoints outside
+            function draw_line4()
+            {
+                start = [150, 250];
+                end = [550, 400];
+
+                stack.push([start, end]);
+
+                context.beginPath();
+                context.moveTo(start[0], start[1]);
+                context.lineTo(end[0], end[1]);
+
+                context.strokeStyle = "#ff00ff";
+                context.lineWidth = 1;
+                context.stroke();
+            }
+
+		</script>
+	</body>
+</html>
